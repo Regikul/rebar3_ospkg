@@ -1,4 +1,4 @@
--module(ospkg_prv).
+-module(rebar3_ospkg_prv).
 
 -export([init/1, do/1, format_error/1]).
 
