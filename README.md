@@ -36,7 +36,7 @@ Example config
     {files_dir, {app_with_conf, "priv/debian"}},
 
     %% DEBIAN/control
-    {provides, "package_name"},
+    {provides, "packagename"},
     {maintainer, "Ivan Petrov <some@email.somewhere>"},
     {architecture, "all"},
     {section, "net"},
