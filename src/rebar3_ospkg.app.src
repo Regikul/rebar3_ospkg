@@ -1,4 +1,4 @@
-{application, ospkg, [
+{application, rebar3_ospkg, [
   {description, "A rebar plugin"},
   {vsn, "0.1.0"},
   {registered, []},
