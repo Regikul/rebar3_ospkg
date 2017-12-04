@@ -19,8 +19,7 @@ Add the plugin to your rebar.config:
 
 Then just call your plugin directly in an existing application:
 
-    $ rebar3 release
-    $ rebar3 ospkg -n $PACKAGE_VERSION -t $PACKAGE_TYPE
+    $ rebar3 do release, ospkg -n $PACKAGE_VERSION -t $PACKAGE_TYPE
     ===> Fetching ospkg
     ===> Compiling ospkg
     <Plugin Output>
@@ -32,6 +31,7 @@ Example config
 
 ```
 {ospkg, [
+  {install_dir, "/opt"},
   {deb, [
     {files_dir, {app_with_conf, "priv/debian"}},
 
@@ -46,8 +46,7 @@ Example config
     {conflicts, ""},
     {replaces, ""},
     {recommends, ""},
-    {suggests, ""},
-    {fakeroot, "/opt"}
+    {suggests, ""}
   ]}
 ]}.
 ```
@@ -59,8 +58,7 @@ Known issues
 
 Currently plugin can not be called alone, due to relx eating all command line args. You can generate packages like that:
 
-    $ rebar3 release
-    $ rebar3 ospkg -n $PACKAGE_VERSION -t $PACKAGE_TYPE
+    $ rebar3 do release, ospkg -n $PACKAGE_VERSION -t $PACKAGE_TYPE
 
 
 Acknowledgements

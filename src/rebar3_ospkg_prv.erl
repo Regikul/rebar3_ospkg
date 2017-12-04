@@ -60,18 +60,10 @@ make_package(State, WorkDir, "deb") ->
 
   file:make_dir(PackageRoot),
   file:make_dir(Debian),
-  FakeRootDir = case lists:keyfind(deb, 1, rebar_state:get(State, ospkg, [])) of
-                  {deb, Options} when is_list(Options) ->
-                    case lists:keyfind(fakeroot, 1, Options) of
-                      {fakeroot, Path} when is_list(Path) ->
-                        case Path of
-                          [$/ | Tail] -> Tail;
-                          _ -> Path
-                        end;
-                      _ -> "opt"
-                    end;
-                  _ ->
-                    "opt"
+  FakeRootDir = case lists:keyfind(install_dir, 1, rebar_state:get(State, ospkg, [])) of
+                  {install_dir, [$/ | Path]} -> Path;
+                  {install_dir, Path} when is_list(Path) -> Path;
+                  _ -> "opt"
                 end,
   file:make_dir(filename:join([PackageRoot, FakeRootDir])),
   file:make_dir(InstallDir = filename:join([PackageRoot, FakeRootDir, Name])),
@@ -92,7 +84,7 @@ make_package(State, WorkDir, "deb") ->
   end,
 
   generate_control_file(Debian, State),
-  generate_md5sums_file(Debian, PackageRoot),
+  generate_md5sums_file(Debian, FakeRootDir, PackageRoot),
   copy_files(Debian, State),
   generate_deb(WorkDir, PackageDir),
   'rm -rf'(PackageRoot),
@@ -202,9 +194,9 @@ not_equal(Char) ->
     Char =/= Input
   end.
 
--spec generate_md5sums_file(file:filename(), file:filename()) -> ok.
-generate_md5sums_file(DebianDir, PackageRoot) ->
-  Cmd = "(cd " ++ PackageRoot ++ " && find opt/ -type f | xargs md5sum)  >> " ++ filename:join([DebianDir, "md5sums"]),
+-spec generate_md5sums_file(file:filename(), file:filename(), file:filename()) -> ok.
+generate_md5sums_file(DebianDir, InstallDir, PackageRoot) ->
+  Cmd = "(cd " ++ PackageRoot ++ " && find " ++ InstallDir ++" -type f | xargs md5sum)  >> " ++ filename:join([DebianDir, "md5sums"]),
   shell_cmd(Cmd).
 
 -spec copy_files(file:filename(), rebar_state:t()) -> ok.
