@@ -1,3 +1,4 @@
+%% -*- mode: erlang;erlang-indent-level: 2;indent-tabs-mode: nil -*-
 -module(rebar3_ospkg_prv).
 
 -export([init/1, do/1, format_error/1]).
@@ -144,25 +145,25 @@ fetch_and_write_to(Control, Options) ->
 -spec control_file_formats() -> proplists:proplist().
 control_file_formats() ->
   [
-    {provides, "Provides: ~s~n"},
-    {maintainer, "Maintainer: ~s~n"},
-    {architecture, "Architecture: ~s~n"},
-    {section, "Section: ~s~n"},
-    {description, "Description: ~s~n"},
-    {depends, "Depends: ~s~n"},
-    {'pre-depends', "Pre-Depends: ~s~n"},
-    {conflicts, "Conflicts: ~s~n"},
-    {replaces, "Replaces: ~s~n"},
-    {recommends, "Recommends: ~s~n"},
-    {suggests, "Suggests: ~s~n"}
+    {provides, "Provides: ~ts~n"},
+    {maintainer, "Maintainer: ~ts~n"},
+    {architecture, "Architecture: ~ts~n"},
+    {section, "Section: ~ts~n"},
+    {description, "Description: ~ts~n"},
+    {depends, "Depends: ~ts~n"},
+    {'pre-depends', "Pre-Depends: ~ts~n"},
+    {conflicts, "Conflicts: ~ts~n"},
+    {replaces, "Replaces: ~ts~n"},
+    {recommends, "Recommends: ~ts~n"},
+    {suggests, "Suggests: ~ts~n"}
   ].
 
 -spec special_formats() -> [{fun ((rebar_state:t()) -> list() | undefined), string()}].
 special_formats() ->
   [
-    {fun get_release_name/1, "Package: ~s~n"},
+    {fun get_release_name/1, "Package: ~ts~n"},
     {fun get_release_package_versions/1, "Version: ~s-~s~n"},
-    {fun get_commit_sha1/1, "Origin: ~s~n"}
+    {fun get_commit_sha1/1, "Origin: ~ts~n"}
   ].
 
 -spec get_release_name(rebar_state:t()) -> list().
@@ -198,17 +199,21 @@ copy_files(Debian, State) ->
   Config = rebar_state:get(State, ospkg, []),
   {deb, Options} = lists:keyfind(deb, 1, Config),
   {files_dir, {App, Path}} = lists:keyfind(files_dir, 1, Options),
-  [AppInfo] = lists:filter(named_as(App), rebar_state:project_apps(State)),
-  AppPath = rebar_app_info:dir(AppInfo),
-  FullPath = filename:join([AppPath, Path, "*"]),
-  'cp -R'(FullPath, Debian),
+  case lists:filter(named_as(App), rebar_state:project_apps(State)) of
+    [AppInfo] ->
+      AppPath = rebar_app_info:dir(AppInfo),
+      FullPath = filename:join([AppPath, Path, "*"]),
+      'cp -R'(FullPath, Debian);
+    [] ->
+      io:format("warning: no addition package files found on app ~p", [App])
+  end,
   ok.
 
 -spec named_as(atom()) -> fun( (rebar_app_info:t()) -> boolean() ).
 named_as(AppName) ->
   fun (AppInfo) ->
     BinName = rebar_app_info:name(AppInfo),
-    AppName =:= binary_to_existing_atom(BinName, utf8)
+    AppName =:= binary_to_atom(BinName, utf8)
   end.
 
 -spec generate_deb(file:filename(), file:filename()) -> ok.
