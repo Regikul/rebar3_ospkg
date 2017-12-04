@@ -60,8 +60,21 @@ make_package(State, WorkDir, "deb") ->
 
   file:make_dir(PackageRoot),
   file:make_dir(Debian),
-  file:make_dir(filename:join([PackageRoot, "opt"])),
-  file:make_dir(InstallDir = filename:join([PackageRoot, "opt", Name])),
+  FakeRootDir = case lists:keyfind(deb, 1, rebar_state:get(State, ospkg, [])) of
+                  {deb, Options} when is_list(Options) ->
+                    case lists:keyfind(fakeroot, 1, Options) of
+                      {fakeroot, Path} when is_list(Path) ->
+                        case Path of
+                          [$/ | Tail] -> Tail;
+                          _ -> Path
+                        end;
+                      _ -> "opt"
+                    end;
+                  _ ->
+                    "opt"
+                end,
+  file:make_dir(filename:join([PackageRoot, FakeRootDir])),
+  file:make_dir(InstallDir = filename:join([PackageRoot, FakeRootDir, Name])),
   'cp -R'(filename:join([WorkDir, "bin"]), filename:join([InstallDir, "bin"])),
   'cp -R'(filename:join([WorkDir, "lib"]), filename:join([InstallDir, "lib"])),
   'cp -R'(filename:join([WorkDir, "releases"]), filename:join([InstallDir, "releases"])),
@@ -162,7 +175,7 @@ control_file_formats() ->
 special_formats() ->
   [
     {fun get_release_name/1, "Package: ~ts~n"},
-    {fun get_release_package_versions/1, "Version: ~s-~s~n"},
+    {fun get_release_package_versions/1, "Version: ~ts-~ts~n"},
     {fun get_commit_sha1/1, "Origin: ~ts~n"}
   ].
 
@@ -223,7 +236,7 @@ generate_deb(WorkDir, PackageDir) ->
 
 -spec shell_cmd(string()) -> ok.
 shell_cmd(Command) ->
-  rebar_api:info("Executing `~s`", [Command]),
+  rebar_api:info("Executing `~ts`", [Command]),
   Output = os:cmd(Command),
-  rebar_api:info("Output: ~s", [Output]),
+  rebar_api:info("Output: ~ts", [Output]),
   ok.
