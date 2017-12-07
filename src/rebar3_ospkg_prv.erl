@@ -52,7 +52,7 @@ make_package(State, WorkDir, "deb") ->
   {Args, _} = rebar_state:command_parsed_args(State),
   {build_no, BuildNumber} = lists:keyfind(build_no, 1, Args),
   {release, {Name, Vsn}, _} = lists:keyfind(release, 1, Config),
-  {include_erts, IncludeErts} = lists:keyfind(include_erts, 1, Config),
+  %% {include_erts, IncludeErts} = lists:keyfind(include_erts, 1, Config), %% FIXME: not working with profiles (for example, ./rebar3 as prod release,ospkg if on default profile include_erts==false, but is prod true)
 
   PackageDir = atom_to_list(Name) ++ "_" ++ Vsn ++ "-" ++ BuildNumber,
   PackageRoot = filename:join([WorkDir, PackageDir]),
@@ -72,14 +72,14 @@ make_package(State, WorkDir, "deb") ->
   'cp -R'(filename:join([WorkDir, "releases"]), filename:join([InstallDir, "releases"])),
   {ok, Names} = file:list_dir(WorkDir),
 
-  case IncludeErts andalso find_erts(Names) of
-    false -> undefined;
-    no_erts -> undefined;
+  case find_erts(Names) of
     {ok, Erts} ->
       'cp -R'(filename:join([WorkDir, Erts]), filename:join([InstallDir, Erts])),
       Erts;
     {multiple, _} ->
       rebar_api:warning("Found more than one erts, all of them will be skipped"),
+      undefined;
+    _ ->
       undefined
   end,
 
