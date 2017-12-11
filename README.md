@@ -14,7 +14,7 @@ Use
 Add the plugin to your rebar.config:
 
     {plugins, [
-        {rebar3_ospkg, {git, "http://github.com/regikul/rebar3_ospkg", {tag, "v0.1.1"}}}
+        {rebar3_ospkg, {git, "http://github.com/regikul/rebar3_ospkg", {tag, "v0.1.2"}}}
     ]}.
 
 Then just call your plugin directly in an existing application:
