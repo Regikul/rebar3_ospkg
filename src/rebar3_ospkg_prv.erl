@@ -1,3 +1,4 @@
+%% -*- mode: erlang;erlang-indent-level: 2;indent-tabs-mode: nil -*-
 -module(rebar3_ospkg_prv).
 
 -export([init/1, do/1, format_error/1]).
@@ -51,7 +52,7 @@ make_package(State, WorkDir, "deb") ->
   {Args, _} = rebar_state:command_parsed_args(State),
   {build_no, BuildNumber} = lists:keyfind(build_no, 1, Args),
   {release, {Name, Vsn}, _} = lists:keyfind(release, 1, Config),
-  {include_erts, IncludeErts} = lists:keyfind(include_erts, 1, Config),
+  %% {include_erts, IncludeErts} = lists:keyfind(include_erts, 1, Config), %% FIXME: not working with profiles (for example, ./rebar3 as prod release,ospkg if on default profile include_erts==false, but is prod true)
 
   PackageDir = atom_to_list(Name) ++ "_" ++ Vsn ++ "-" ++ BuildNumber,
   PackageRoot = filename:join([WorkDir, PackageDir]),
@@ -59,26 +60,31 @@ make_package(State, WorkDir, "deb") ->
 
   file:make_dir(PackageRoot),
   file:make_dir(Debian),
-  file:make_dir(filename:join([PackageRoot, "opt"])),
-  file:make_dir(InstallDir = filename:join([PackageRoot, "opt", Name])),
+  FakeRootDir = case lists:keyfind(install_dir, 1, rebar_state:get(State, ospkg, [])) of
+                  {install_dir, [$/ | Path]} -> Path;
+                  {install_dir, Path} when is_list(Path) -> Path;
+                  _ -> "opt"
+                end,
+  file:make_dir(filename:join([PackageRoot, FakeRootDir])),
+  file:make_dir(InstallDir = filename:join([PackageRoot, FakeRootDir, Name])),
   'cp -R'(filename:join([WorkDir, "bin"]), filename:join([InstallDir, "bin"])),
   'cp -R'(filename:join([WorkDir, "lib"]), filename:join([InstallDir, "lib"])),
   'cp -R'(filename:join([WorkDir, "releases"]), filename:join([InstallDir, "releases"])),
   {ok, Names} = file:list_dir(WorkDir),
 
-  case IncludeErts andalso find_erts(Names) of
-    false -> undefined;
-    no_erts -> undefined;
+  case find_erts(Names) of
     {ok, Erts} ->
       'cp -R'(filename:join([WorkDir, Erts]), filename:join([InstallDir, Erts])),
       Erts;
     {multiple, _} ->
       rebar_api:warning("Found more than one erts, all of them will be skipped"),
+      undefined;
+    _ ->
       undefined
   end,
 
   generate_control_file(Debian, State),
-  generate_md5sums_file(Debian, PackageRoot),
+  generate_md5sums_file(Debian, FakeRootDir, PackageRoot),
   copy_files(Debian, State),
   generate_deb(WorkDir, PackageDir),
   'rm -rf'(PackageRoot),
@@ -144,25 +150,25 @@ fetch_and_write_to(Control, Options) ->
 -spec control_file_formats() -> proplists:proplist().
 control_file_formats() ->
   [
-    {provides, "Provides: ~s~n"},
-    {maintainer, "Maintainer: ~s~n"},
-    {architecture, "Architecture: ~s~n"},
-    {section, "Section: ~s~n"},
-    {description, "Description: ~s~n"},
-    {depends, "Depends: ~s~n"},
-    {'pre-depends', "Pre-Depends: ~s~n"},
-    {conflicts, "Conflicts: ~s~n"},
-    {replaces, "Replaces: ~s~n"},
-    {recommends, "Recommends: ~s~n"},
-    {suggests, "Suggests: ~s~n"}
+    {provides, "Provides: ~ts~n"},
+    {maintainer, "Maintainer: ~ts~n"},
+    {architecture, "Architecture: ~ts~n"},
+    {section, "Section: ~ts~n"},
+    {description, "Description: ~ts~n"},
+    {depends, "Depends: ~ts~n"},
+    {'pre-depends', "Pre-Depends: ~ts~n"},
+    {conflicts, "Conflicts: ~ts~n"},
+    {replaces, "Replaces: ~ts~n"},
+    {recommends, "Recommends: ~ts~n"},
+    {suggests, "Suggests: ~ts~n"}
   ].
 
 -spec special_formats() -> [{fun ((rebar_state:t()) -> list() | undefined), string()}].
 special_formats() ->
   [
-    {fun get_release_name/1, "Package: ~s~n"},
-    {fun get_release_package_versions/1, "Version: ~s-~s~n"},
-    {fun get_commit_sha1/1, "Origin: ~s~n"}
+    {fun get_release_name/1, "Package: ~ts~n"},
+    {fun get_release_package_versions/1, "Version: ~ts-~ts~n"},
+    {fun get_commit_sha1/1, "Origin: ~ts~n"}
   ].
 
 -spec get_release_name(rebar_state:t()) -> list().
@@ -188,9 +194,9 @@ not_equal(Char) ->
     Char =/= Input
   end.
 
--spec generate_md5sums_file(file:filename(), file:filename()) -> ok.
-generate_md5sums_file(DebianDir, PackageRoot) ->
-  Cmd = "(cd " ++ PackageRoot ++ " && find opt/ -type f | xargs md5sum)  >> " ++ filename:join([DebianDir, "md5sums"]),
+-spec generate_md5sums_file(file:filename(), file:filename(), file:filename()) -> ok.
+generate_md5sums_file(DebianDir, InstallDir, PackageRoot) ->
+  Cmd = "(cd " ++ PackageRoot ++ " && find " ++ InstallDir ++" -type f | xargs md5sum)  >> " ++ filename:join([DebianDir, "md5sums"]),
   shell_cmd(Cmd).
 
 -spec copy_files(file:filename(), rebar_state:t()) -> ok.
@@ -198,17 +204,21 @@ copy_files(Debian, State) ->
   Config = rebar_state:get(State, ospkg, []),
   {deb, Options} = lists:keyfind(deb, 1, Config),
   {files_dir, {App, Path}} = lists:keyfind(files_dir, 1, Options),
-  [AppInfo] = lists:filter(named_as(App), rebar_state:project_apps(State)),
-  AppPath = rebar_app_info:dir(AppInfo),
-  FullPath = filename:join([AppPath, Path, "*"]),
-  'cp -R'(FullPath, Debian),
+  case lists:filter(named_as(App), rebar_state:project_apps(State)) of
+    [AppInfo] ->
+      AppPath = rebar_app_info:dir(AppInfo),
+      FullPath = filename:join([AppPath, Path, "*"]),
+      'cp -R'(FullPath, Debian);
+    [] ->
+      io:format("warning: no addition package files found on app ~p", [App])
+  end,
   ok.
 
 -spec named_as(atom()) -> fun( (rebar_app_info:t()) -> boolean() ).
 named_as(AppName) ->
   fun (AppInfo) ->
     BinName = rebar_app_info:name(AppInfo),
-    AppName =:= binary_to_existing_atom(BinName, utf8)
+    AppName =:= binary_to_atom(BinName, utf8)
   end.
 
 -spec generate_deb(file:filename(), file:filename()) -> ok.
@@ -218,7 +228,7 @@ generate_deb(WorkDir, PackageDir) ->
 
 -spec shell_cmd(string()) -> ok.
 shell_cmd(Command) ->
-  rebar_api:info("Executing `~s`", [Command]),
+  rebar_api:info("Executing `~ts`", [Command]),
   Output = os:cmd(Command),
-  rebar_api:info("Output: ~s", [Output]),
+  rebar_api:info("Output: ~ts", [Output]),
   ok.
